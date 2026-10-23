@@ -60,7 +60,21 @@ var (
 	dsn       string
 	netAddr   string
 	available bool
+
+	// dsnParams are extra DSN parameters every test connection carries
+	// (MYSQL_TEST_DSN_PARAMS, "name=value&..."), for a server that needs
+	// session settings on each connection: an unknown parameter is sent as
+	// a session system variable.
+	dsnParams string
 )
+
+// withDSNParams appends dsnParams to a test DSN that already has a query.
+func withDSNParams(s string) string {
+	if dsnParams == "" {
+		return s
+	}
+	return s + "&" + dsnParams
+}
 
 var (
 	tDate      = time.Date(2012, 6, 14, 0, 0, 0, 0, time.UTC)
@@ -86,8 +100,9 @@ func init() {
 	prot = env("MYSQL_TEST_PROT", "tcp")
 	addr = env("MYSQL_TEST_ADDR", "localhost:3306")
 	dbname = env("MYSQL_TEST_DBNAME", "gotest")
+	dsnParams = env("MYSQL_TEST_DSN_PARAMS", "")
 	netAddr = fmt.Sprintf("%s(%s)", prot, addr)
-	dsn = fmt.Sprintf("%s:%s@%s/%s?timeout=30s", user, pass, netAddr, dbname)
+	dsn = withDSNParams(fmt.Sprintf("%s:%s@%s/%s?timeout=30s", user, pass, netAddr, dbname))
 	c, err := net.Dial(prot, addr)
 	if err == nil {
 		available = true
@@ -2021,7 +2036,7 @@ func testDialError(t *testing.T, dialErr error, expectErr error) {
 		return nil, dialErr
 	})
 
-	db, err := sql.Open(driverNameTest, fmt.Sprintf("%s:%s@mydial(%s)/%s?timeout=30s", user, pass, addr, dbname))
+	db, err := sql.Open(driverNameTest, withDSNParams(fmt.Sprintf("%s:%s@mydial(%s)/%s?timeout=30s", user, pass, addr, dbname)))
 	if err != nil {
 		t.Fatalf("error connecting: %s", err.Error())
 	}
@@ -2060,7 +2075,7 @@ func TestCustomDial(t *testing.T) {
 		return d.DialContext(ctx, prot, addr)
 	})
 
-	db, err := sql.Open(driverNameTest, fmt.Sprintf("%s:%s@mydial(%s)/%s?timeout=30s", user, pass, addr, dbname))
+	db, err := sql.Open(driverNameTest, withDSNParams(fmt.Sprintf("%s:%s@mydial(%s)/%s?timeout=30s", user, pass, addr, dbname)))
 	if err != nil {
 		t.Fatalf("error connecting: %s", err.Error())
 	}
@@ -2077,7 +2092,7 @@ func TestBeforeConnect(t *testing.T) {
 	}
 
 	// dbname is set in the BeforeConnect handle
-	cfg, err := ParseDSN(fmt.Sprintf("%s:%s@%s/%s?timeout=30s", user, pass, netAddr, "_"))
+	cfg, err := ParseDSN(withDSNParams(fmt.Sprintf("%s:%s@%s/%s?timeout=30s", user, pass, netAddr, "_")))
 	if err != nil {
 		t.Fatalf("error parsing DSN: %v", err)
 	}
@@ -2380,7 +2395,7 @@ func TestEmptyPassword(t *testing.T) {
 		t.Skipf("MySQL server not running on %s", netAddr)
 	}
 
-	dsn := fmt.Sprintf("%s:%s@%s/%s?timeout=30s", user, "", netAddr, dbname)
+	dsn := withDSNParams(fmt.Sprintf("%s:%s@%s/%s?timeout=30s", user, "", netAddr, dbname))
 	db, err := sql.Open(driverNameTest, dsn)
 	if err == nil {
 		defer db.Close()
@@ -3351,7 +3366,7 @@ func TestConnectorObeysDialTimeouts(t *testing.T) {
 		return d.DialContext(ctx, prot, addr)
 	})
 
-	db, err := sql.Open(driverNameTest, fmt.Sprintf("%s:%s@dialctxtest(%s)/%s?timeout=30s", user, pass, addr, dbname))
+	db, err := sql.Open(driverNameTest, withDSNParams(fmt.Sprintf("%s:%s@dialctxtest(%s)/%s?timeout=30s", user, pass, addr, dbname)))
 	if err != nil {
 		t.Fatalf("error connecting: %s", err.Error())
 	}
